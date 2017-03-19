@@ -1,5 +1,6 @@
 package com.example.sonis.customcamera;
 
+import android.app.ProgressDialog;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
@@ -9,6 +10,7 @@ import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Environment;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -19,7 +21,15 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.Toast;
 import android.widget.VideoView;
+
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.OnProgressListener;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,6 +46,9 @@ public class PreviewImage extends AppCompatActivity implements View.OnClickListe
     private Uri videoUri;
     private ImageView imageView;
     private TextureView videoView;
+    private StorageReference mStorageRef;
+    Uri uri;
+    File audioFile;
 
     private Surface s;
     @Override
@@ -43,7 +56,11 @@ public class PreviewImage extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_preview_image);
 
-        Uri uri = getIntent().getParcelableExtra("URIOFIMAGE");
+        mStorageRef = FirebaseStorage.getInstance()
+                .getReferenceFromUrl("gs://customcamera-d4011.appspot.com");
+
+       uri = getIntent().getParcelableExtra("URIOFIMAGE");
+        Log.d("IMAGEURI",uri.toString());
        // videoUri = getIntent().getParcelableExtra("URIOFVIDEO");
         time = getIntent().getStringExtra("TIMEFORMAT");
         height=getIntent().getIntExtra("height",0);
@@ -144,6 +161,7 @@ public class PreviewImage extends AppCompatActivity implements View.OnClickListe
                     myAudioRecorder.prepare();
                     isAudioRecording=true;
                     myAudioRecorder.start();
+                    audioFile = new File(path+"/"+time+".3gp");
                 }catch (Exception e)
                 {
                     Log.e("PreviewImage",e.getLocalizedMessage(),e);
@@ -178,7 +196,104 @@ public class PreviewImage extends AppCompatActivity implements View.OnClickListe
                     }
                 });
                 playSound();
+                uploadFile();
                 break;
+
+
+
+        }
+    }
+
+    private void uploadFile(){
+        if(uri!=null){
+            //displaying a progress dialog while upload is going on
+            final ProgressDialog progressDialog = new ProgressDialog(this);
+            progressDialog.setTitle("Uploading");
+            progressDialog.show();
+
+            StorageReference ImageRef = mStorageRef.child("images")
+                    .child(uri.getLastPathSegment());
+
+            Uri audioUri = Uri.fromFile(audioFile);
+
+            StorageReference audioRef = mStorageRef.child("audio")
+                    .child(uri.getLastPathSegment());
+
+            Log.d("AUDIO",audioUri.toString());
+
+
+
+//            Log.d("uploadURI",filePath.toString());
+            ImageRef.putFile(uri)
+                    .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                        @Override
+                        public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                            //if the upload is successfull
+                            //hiding the progress dialog
+                            progressDialog.dismiss();
+//                            imageView.setVisibility(View.INVISIBLE);
+                            //and displaying a success toast
+                            Toast.makeText(getApplicationContext(), "File Uploaded ", Toast.LENGTH_LONG).show();
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception exception) {
+                            //if the upload is not successfull
+                            //hiding the progress dialog
+                            progressDialog.dismiss();
+                            Log.e("onFailure()",exception.toString());
+                            //and displaying error message
+                            Toast.makeText(getApplicationContext(), exception.getMessage(), Toast.LENGTH_LONG).show();
+                        }
+                    })
+                    .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
+                        @Override
+                        public void onProgress(UploadTask.TaskSnapshot taskSnapshot) {
+                            //calculating progress percentage
+                            @SuppressWarnings("VisibleForTests")
+                            double progress = (100.0 * taskSnapshot.getBytesTransferred()) / taskSnapshot.getTotalByteCount();
+
+                            //displaying percentage in progress dialog
+                            progressDialog.setMessage("Uploaded " + ((int) progress) + "%...");
+                        }
+                    });
+
+            audioRef.putFile(audioUri)
+                    .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                        @Override
+                        public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                            //if the upload is successfull
+                            //hiding the progress dialog
+                            //progressDialog.dismiss();
+//                            imageView.setVisibility(View.INVISIBLE);
+                            //and displaying a success toast
+                            Toast.makeText(getApplicationContext(), "File Uploaded ", Toast.LENGTH_LONG).show();
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception exception) {
+                            //if the upload is not successfull
+                            //hiding the progress dialog
+                            //progressDialog.dismiss();
+                            Log.e("onFailure()",exception.toString());
+                            //and displaying error message
+                            Toast.makeText(getApplicationContext(), exception.getMessage(), Toast.LENGTH_LONG).show();
+                        }
+                    })
+                    .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
+                        @Override
+                        public void onProgress(UploadTask.TaskSnapshot taskSnapshot) {
+                            //calculating progress percentage
+                            @SuppressWarnings("VisibleForTests")
+                            double progress = (100.0 * taskSnapshot.getBytesTransferred()) / taskSnapshot.getTotalByteCount();
+
+                            //displaying percentage in progress dialog
+                            //progressDialog.setMessage("Uploaded " + ((int) progress) + "%...");
+                        }
+                    });
+
 
         }
     }

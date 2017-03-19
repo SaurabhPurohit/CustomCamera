@@ -43,4 +43,5 @@
         android:visibility="gone"
         android:src="@drawable/ic_linked_camera_black_24dp"
         android:layout_gravity="center" />
+
 </FrameLayout>
